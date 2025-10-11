@@ -1,8 +1,10 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.responses import JSONResponse
 from app.schemas.pii import PIIDetectionRequest, PIIDetectionResponse
 from app.services.pii_service import PIIDetectionService
 from app.ai.model_manager import get_pii_detector
+from app.core.dependencies import get_current_user
+from app.models.user import User
 import logging
 
 logger = logging.getLogger(__name__)
@@ -12,12 +14,15 @@ router = APIRouter()
 # 서비스 인스턴스 생성 (이제 모델은 싱글톤으로 관리됨)
 pii_service = PIIDetectionService()
 
-@router.post("/detect", 
+@router.post("/detect",
              response_model=PIIDetectionResponse,
-             summary="PII 탐지",
-             description="입력된 텍스트에서 개인정보를 탐지하고 결과를 반환합니다.",
+             summary="PII 탐지 (인증 필요)",
+             description="입력된 텍스트에서 개인정보를 탐지하고 결과를 반환합니다. JWT 토큰 필요.",
              status_code=status.HTTP_200_OK)
-async def detect_pii(request: PIIDetectionRequest) -> PIIDetectionResponse:
+async def detect_pii(
+    request: PIIDetectionRequest,
+    current_user: User = Depends(get_current_user)
+) -> PIIDetectionResponse:
     """
     텍스트에서 개인정보 탐지 API
     
@@ -38,7 +43,7 @@ async def detect_pii(request: PIIDetectionRequest) -> PIIDetectionResponse:
             )
         
         # PII 탐지 수행
-        logger.info(f"PII detection started for text length: {len(request.text)}")
+        logger.info(f"PII detection started for user: {current_user.username}, text length: {len(request.text)}")
         result = await pii_service.analyze_text(request.text.strip())
         
         logger.info(f"PII detection completed. Has PII: {result.has_pii}, Entities: {len(result.entities)}")
@@ -64,10 +69,12 @@ async def detect_pii(request: PIIDetectionRequest) -> PIIDetectionResponse:
             detail="PII 탐지 중 오류가 발생했습니다."
         )
 
-@router.get("/health", 
-            summary="PII 탐지 서비스 상태 확인",
-            description="PII 탐지 모델이 정상적으로 로드되었는지 확인합니다.")
-async def health_check():
+@router.get("/health",
+            summary="PII 탐지 서비스 상태 확인 (인증 필요)",
+            description="PII 탐지 모델이 정상적으로 로드되었는지 확인합니다. JWT 토큰 필요.")
+async def health_check(
+    current_user: User = Depends(get_current_user)
+):
     """PII 탐지 서비스 헬스체크"""
     try:
         # 모델 인스턴스 상태 확인 (실제 추론 없이 빠른 체크)
@@ -80,7 +87,8 @@ async def health_check():
                 "status": "healthy",
                 "message": "PII detection service is running",
                 "model_loaded": model_loaded,
-                "model_name": detector.model_name
+                "model_name": detector.model_name,
+                "authenticated_user": current_user.username
             }
         )
     except Exception as e:
