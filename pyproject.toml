@@ -1,0 +1,18 @@
+[project]
+name = "ai-tls-dlp-be"
+version = "1.0.0"
+description = "AI-based PII Detection Backend using Regex and BERT NER"
+requires-python = ">=3.13"
+dependencies = [
+    # Web Framework
+    "fastapi>=0.116.1",
+    "uvicorn>=0.35.0",
+
+    # AI/ML Models (PII Detection only)
+    "torch>=2.0.0",
+    "transformers>=4.30.0",
+    "tokenizers>=0.13.3",
+
+    # Utils
+    "pydantic>=2.0.0",
+]
