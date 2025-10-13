@@ -37,7 +37,7 @@ htmlcov/
 
 # Model cache (Hugging Face)
 .cache/
-models/
+
 
 # Temporary files
 *.tmp
