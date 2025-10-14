@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routers.pii import router as pii_router
 from app.api.routers.auth import router as auth_router
+from app.api.routers.logs import router as logs_router
 from app.ai.model_manager import preload_models, cleanup_models
 import logging
 
@@ -30,6 +31,7 @@ app.add_middleware(
 # 라우터 추가
 app.include_router(auth_router, tags=["Authentication"])  # 인증 API (인증 불필요)
 app.include_router(pii_router, prefix="/api/v1/pii", tags=["PII Detection"])  # PII API (인증 필수)
+app.include_router(logs_router, prefix="/api/v1/logs", tags=["Logs"])  # 로그 API
 
 # 애플리케이션 시작/종료 이벤트 핸들러
 @app.on_event("startup")
