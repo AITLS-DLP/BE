@@ -1,7 +1,9 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Request
 from fastapi.responses import JSONResponse
 from app.schemas.pii import PIIDetectionRequest, PIIDetectionResponse
 from app.services.pii_service import PIIDetectionService
+from app.schemas.log import PIIDetectionLog, LogLevel
+from app.repositories.log_repository import get_log_repository
 from app.ai.model_manager import get_pii_detector
 from app.core.dependencies import get_current_user
 from app.models.user import User
@@ -21,6 +23,7 @@ pii_service = PIIDetectionService()
              status_code=status.HTTP_200_OK)
 async def detect_pii(
     request: PIIDetectionRequest,
+    request_obj: Request,
     current_user: User = Depends(get_current_user)
 ) -> PIIDetectionResponse:
     """
@@ -42,11 +45,13 @@ async def detect_pii(
                 detail="입력 텍스트가 비어있습니다."
             )
         
-        # PII 탐지 수행
+        # PII 탐지 수행 + 처리 시간 측정
+        from time import perf_counter
+        started_at = perf_counter()
         logger.info(f"PII detection started for user: {current_user.username}, text length: {len(request.text)}")
         result = await pii_service.analyze_text(request.text.strip())
-        
-        logger.info(f"PII detection completed. Has PII: {result.has_pii}, Entities: {len(result.entities)}")
+        duration_ms = (perf_counter() - started_at) * 1000.0
+        logger.info(f"PII detection completed in {duration_ms:.1f} ms. Has PII: {result.has_pii}, Entities: {len(result.entities)}")
         
         # 디버깅을 위해 원시 예측 결과 로그 출력
         from app.ai.model_manager import get_pii_detector
@@ -57,6 +62,36 @@ async def detect_pii(
         # 임시: 디버깅을 위해 raw_predictions를 응답에 포함
         response_dict = result.model_dump()
         response_dict["debug_raw_predictions"] = raw_predictions[:20]  # 처음 20개만
+        
+        # Elasticsearch에 로그 저장 (best-effort)
+        try:
+            client_ip = request_obj.client.host if request_obj.client else "unknown"
+            user_agent = request_obj.headers.get("user-agent")
+            entity_types = list({e.type for e in result.entities})
+            detected_entities = [e.model_dump() for e in result.entities]
+            log = PIIDetectionLog(
+                level=LogLevel.INFO,
+                client_ip=client_ip,
+                user_agent=user_agent,
+                request_id=request_obj.headers.get("x-request-id"),
+                input_text=request.text,
+                text_length=len(request.text),
+                has_pii=result.has_pii,
+                detected_entities=detected_entities,
+                entity_count=len(detected_entities),
+                entity_types=entity_types,
+                processing_time_ms=duration_ms,
+                reason=result.reason,
+                details=result.details,
+                metadata={
+                    "username": current_user.username,
+                    "path": str(request_obj.url.path)
+                }
+            )
+            repo = get_log_repository()
+            await repo.save_log(log)
+        except Exception as log_err:
+            logger.warning(f"Failed to write detection log to ES: {log_err}")
         
         return response_dict
         

@@ -7,7 +7,7 @@ DDD Service Layer:
 - 도메인 규칙 검증
 """
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.repository.user_repo import UserRepository
+from app.repositories.user_repo import UserRepository
 from app.models.user import User
 
 

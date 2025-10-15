@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     DEFAULT_PII_THRESHOLD: float = 0.59
     MODEL_MODE: str = "LOCAL"
     
+    # Elasticsearch
+    ELASTICSEARCH_URL: str = os.getenv("ELASTICSEARCH_URL", "http://localhost:9200")
+    ELASTICSEARCH_USERNAME: str | None = os.getenv("ELASTICSEARCH_USERNAME")
+    ELASTICSEARCH_PASSWORD: str | None = os.getenv("ELASTICSEARCH_PASSWORD")
+    ELASTICSEARCH_INDEX_PREFIX: str = os.getenv("ELASTICSEARCH_INDEX_PREFIX", "dlp")
+    
     class Config:
         env_file = ".env"
         case_sensitive = True
