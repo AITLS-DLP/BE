@@ -401,3 +401,6 @@ def get_log_repository() -> LogRepository:
     if _log_repository_instance is None:
         _log_repository_instance = LogRepository()
     return _log_repository_instance
+
+
+
