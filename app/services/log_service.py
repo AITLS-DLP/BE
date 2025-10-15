@@ -70,3 +70,5 @@ class LogService:
                 logs=[], total=0, page=1,
                 size=limit, total_pages=0
             )
+
+#깃 커밋 확인용
