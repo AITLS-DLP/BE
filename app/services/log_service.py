@@ -34,6 +34,18 @@ class LogService:
                 size=search_request.size, total_pages=0
             )
     
+    async def get_log_by_id(self, log_id: str) -> Optional[PIIDetectionLog]:
+        """ID로 단일 로그 조회"""
+        try:
+            logger.info(f"Fetching log with id: {log_id}")
+            log = await self.log_repository.get_log_by_id(log_id)
+            if not log:
+                logger.warning(f"Log with id '{log_id}' not found in service.")
+            return log
+        except Exception as e:
+            logger.error(f"Failed to get log by id in service: {str(e)}")
+            return None
+    
     async def get_stats(self, days: int = 7) -> LogStatsResponse:
         """로그 통계 조회"""
         try:

@@ -117,6 +117,24 @@ class LogRepository:
             logger.error(f"Failed to save log to Elasticsearch: {str(e)}")
             return False
     
+    async def get_log_by_id(self, log_id: str) -> Optional[PIIDetectionLog]:
+        """ID로 단일 로그 조회"""
+        if not self.es_client:
+            logger.warning("Elasticsearch client not available")
+            return None
+        
+        try:
+            response = self.es_client.get(index=self.index_name, id=log_id)
+            source = response["_source"]
+            source["id"] = response["_id"]
+            return PIIDetectionLog(**source)
+        except NotFoundError:
+            logger.warning(f"Log with id '{log_id}' not found.")
+            return None
+        except Exception as e:
+            logger.error(f"Failed to get log by id: {str(e)}")
+            return None
+    
     async def search_logs(self, search_request: LogSearchRequest) -> LogSearchResponse:
         """로그 검색"""
         if not self.es_client:
@@ -140,7 +158,7 @@ class LogRepository:
                     "query": query,
                     "from": from_index,
                     "size": search_request.size,
-                    "sort": [{"timestamp": {"order": "desc"}}]
+                    "sort": [{search_request.sort_by: {"order": search_request.sort_order}}]
                 }
             )
             

@@ -63,6 +63,10 @@ class LogSearchRequest(BaseModel):
     page: int = Field(1, description="페이지 번호", ge=1)
     size: int = Field(20, description="페이지 크기", ge=1, le=100)
 
+    # 정렬
+    sort_by: str = Field("timestamp", description="정렬 기준 필드")
+    sort_order: str = Field("desc", description="정렬 순서 (asc/desc)")
+
 class LogSearchResponse(BaseModel):
     """로그 검색 응답 스키마"""
     
