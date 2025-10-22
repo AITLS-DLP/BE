@@ -24,6 +24,7 @@ class LogRepository:
                 "verify_certs": False,
                 "request_timeout": 30,
             }
+            print(f"DEBUG: Attempting to connect to Elasticsearch at: {settings.ELASTICSEARCH_URL}") # DEBUG PRINT
             
             # 인증 정보가 있으면 추가
             if settings.ELASTICSEARCH_USERNAME and settings.ELASTICSEARCH_PASSWORD:
@@ -36,12 +37,12 @@ class LogRepository:
                 logger.info(f"Elasticsearch connected: {settings.ELASTICSEARCH_URL}")
                 self._create_index_if_not_exists()
             else:
-                logger.error("Failed to connect to Elasticsearch")
                 self.es_client = None
+                raise ConnectionError("Failed to connect to Elasticsearch. Please check the connection and settings.")
                 
         except Exception as e:
-            logger.error(f"Failed to initialize Elasticsearch: {str(e)}")
             self.es_client = None
+            raise ConnectionError(f"Failed to initialize Elasticsearch: {str(e)}")
     
     def _create_index_if_not_exists(self):
         """인덱스가 없으면 생성"""
@@ -94,8 +95,7 @@ class LogRepository:
     async def save_log(self, log: PIIDetectionLog) -> bool:
         """로그를 Elasticsearch에 저장"""
         if not self.es_client:
-            logger.warning("Elasticsearch client not available")
-            return False
+            raise ConnectionError("Elasticsearch client is not available. Log was not saved.")
         
         try:
             # 고유 ID 생성
@@ -409,6 +409,43 @@ class LogRepository:
                 entity_type_stats={}, hourly_stats={}, avg_processing_time=0.0,
                 top_ips=[]
             )
+
+    async def count_blocks_since(self, start_time: datetime) -> int:
+        """특정 시간 이후의 차단 로그 개수를 집계"""
+        if not self.es_client:
+            logger.warning("Elasticsearch client not available, returning 0")
+            return 0
+        
+        try:
+            query = {
+                "bool": {
+                    "must": [
+                        {
+                            "range": {
+                                "timestamp": {
+                                    "gte": start_time.isoformat()
+                                }
+                            }
+                        },
+                        {
+                            "term": {
+                                "metadata.action.keyword": "BLOCK"
+                            }
+                        }
+                    ]
+                }
+            }
+            
+            response = self.es_client.count(
+                index=self.index_name,
+                body={"query": query}
+            )
+            
+            return response.get("count", 0)
+            
+        except Exception as e:
+            logger.error(f"Failed to count blocked logs: {str(e)}")
+            return 0
 
 # 싱글톤 인스턴스
 _log_repository_instance: Optional[LogRepository] = None

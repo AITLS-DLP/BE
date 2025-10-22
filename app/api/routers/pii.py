@@ -24,7 +24,7 @@ pii_service = PIIDetectionService()
 async def detect_pii(
     request: PIIDetectionRequest,
     request_obj: Request,
-    current_user: User = Depends(get_current_user)
+    # current_user: User = Depends(get_current_user) # 인증 임시 비활성화
 ) -> PIIDetectionResponse:
     """
     텍스트에서 개인정보 탐지 API
@@ -48,7 +48,8 @@ async def detect_pii(
         # PII 탐지 수행 + 처리 시간 측정
         from time import perf_counter
         started_at = perf_counter()
-        logger.info(f"PII detection started for user: {current_user.username}, text length: {len(request.text)}")
+        # logger.info(f"PII detection started for user: {current_user.username}, text length: {len(request.text)}")
+        logger.info(f"PII detection started for user: anonymous, text length: {len(request.text)}") # 인증 임시 비활성화
         result = await pii_service.analyze_text(request.text.strip())
         duration_ms = (perf_counter() - started_at) * 1000.0
         logger.info(f"PII detection completed in {duration_ms:.1f} ms. Has PII: {result.has_pii}, Entities: {len(result.entities)}")
@@ -69,8 +70,16 @@ async def detect_pii(
             user_agent = request_obj.headers.get("user-agent")
             entity_types = list({e.type for e in result.entities})
             detected_entities = [e.model_dump() for e in result.entities]
+            # 메타데이터에 차단 액션 추가
+            log_metadata = {
+                "username": "anonymous", # 인증 임시 비활성화
+                "path": str(request_obj.url.path)
+            }
+            if result.has_pii:
+                log_metadata["action"] = "BLOCK"
+
             log = PIIDetectionLog(
-                level=LogLevel.INFO,
+                level=LogLevel.INFO if not result.has_pii else LogLevel.WARNING, # PII 탐지 시 WARNING
                 client_ip=client_ip,
                 user_agent=user_agent,
                 request_id=request_obj.headers.get("x-request-id"),
@@ -83,10 +92,7 @@ async def detect_pii(
                 processing_time_ms=duration_ms,
                 reason=result.reason,
                 details=result.details,
-                metadata={
-                    "username": current_user.username,
-                    "path": str(request_obj.url.path)
-                }
+                metadata=log_metadata
             )
             repo = get_log_repository()
             await repo.save_log(log)

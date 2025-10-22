@@ -1,7 +1,7 @@
 import logging
 from typing import Optional
 from datetime import datetime, timedelta
-from app.schemas.log import LogSearchRequest, LogSearchResponse, LogStatsResponse
+from app.schemas.log import PIIDetectionLog, LogSearchRequest, LogSearchResponse, LogStatsResponse
 from app.repositories.log_repository import get_log_repository
 
 logger = logging.getLogger(__name__)
@@ -82,5 +82,15 @@ class LogService:
                 logs=[], total=0, page=1,
                 size=limit, total_pages=0
             )
+
+    async def get_block_count_since(self, start_time: datetime) -> int:
+        """특정 시간 이후의 차단 로그 개수를 조회합니다."""
+        try:
+            logger.info(f"Counting blocked logs since {start_time.isoformat()}")
+            count = await self.log_repository.count_blocks_since(start_time)
+            return count
+        except Exception as e:
+            logger.error(f"Failed to count blocked logs in service: {str(e)}")
+            return 0
 
 #깃 커밋 확인용

@@ -2,14 +2,14 @@ from fastapi import APIRouter, HTTPException, status, Query, Depends
 from fastapi.responses import JSONResponse
 from typing import Optional, List
 from datetime import datetime, timedelta
+import logging
+from app.schemas.log import PIIDetectionLog, LogSearchResponse, LogStatsResponse, LogLevel
 from app.schemas.log import LogSearchRequest, LogSearchResponse, LogStatsResponse, LogLevel
 from app.usecases.log_usecases import LogUseCase
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(
-    tags=["logs"]
-)
+router = APIRouter()
 
 @router.get("/search",
             response_model=LogSearchResponse,
