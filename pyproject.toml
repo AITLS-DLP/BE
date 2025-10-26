@@ -8,25 +8,28 @@ dependencies = [
     "fastapi>=0.116.1",
     "uvicorn>=0.35.0",
     "python-multipart>=0.0.9",
-
     # Database
     "sqlalchemy>=2.0.43",
     "asyncpg>=0.29.0",
     "alembic>=1.12.0",
     "greenlet>=3.0.0",
-
     # Authentication
     "python-jose[cryptography]>=3.3.0",
     "passlib[bcrypt]>=1.7.4",
     "python-dotenv>=1.0.0",
-
     # AI/ML Models (PII Detection only)
     "torch>=2.0.0",
     "transformers>=4.30.0",
     "tokenizers>=0.13.3",
-
     # Utils
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
     "email-validator>=2.0.0",
+    # Logging/Elasticsearch
+    "elasticsearch>=8.14.0",
+    "pytz>=2025.2",
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]

@@ -1,6 +1,35 @@
-version: '3.8'
+
 
 services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.14.3
+    container_name: dlp-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - http.port=9200
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200 >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.14.3
+    container_name: dlp-kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - SERVER_PUBLICBASEURL=http://localhost:5601
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+
   postgres:
     image: postgres:15-alpine
     container_name: dlp-postgres
@@ -18,7 +47,30 @@ services:
       timeout: 5s
       retries: 5
 
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dlp-backend
+    ports:
+      - "8000:8000"
+    environment:
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      DATABASE_URL: postgresql+asyncpg://admin:password123@postgres:5432/ai_tlsdlp
+      # 기타 필요한 환경 변수 (예: SECRET_KEY 등)
+      SECRET_KEY: dlp-secret-key-change-in-production-minimum-32-characters-required
+      PII_MODEL_NAME: psh3333/roberta-large-korean-pii5
+      DEFAULT_PII_THRESHOLD: 0.59
+      MODEL_MODE: LOCAL
+    depends_on:
+      - elasticsearch
+      - postgres
+    volumes:
+      - .:/app # 코드 변경 시 컨테이너 재빌드 없이 반영 (개발용)
+
 volumes:
+  es_data:
+    driver: local
   postgres_data:
     driver: local
 
