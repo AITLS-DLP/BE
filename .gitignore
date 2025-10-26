@@ -40,7 +40,8 @@ htmlcov/
 
 
 # Temporary files
-*.tmpAdmin-FE/node_modules/
+*.tmp
+Admin-FE/node_modules/
 Admin-FE/.next/
 Admin-FE/.turbo/
 Admin-FE/dist/

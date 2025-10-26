@@ -316,7 +316,7 @@ class LogRepository:
                 entity_type_stats={}, hourly_stats={}, avg_processing_time=0.0,
                 top_ips=[]
             )
-        
+
         try:
             end_time = datetime.now()
             start_time = end_time - timedelta(days=days)
@@ -409,6 +409,124 @@ class LogRepository:
                 entity_type_stats={}, hourly_stats={}, avg_processing_time=0.0,
                 top_ips=[]
             )
+
+    async def get_dashboard_summary_stats(self, start_time: datetime, end_time: datetime) -> Dict[str, Any]:
+        """대시보드 요약에 필요한 집계 데이터를 조회"""
+        if not self.es_client:
+            logger.warning("Elasticsearch client not available while fetching dashboard summary stats")
+            return {}
+
+        try:
+            query = {
+                "bool": {
+                    "must": [
+                        {
+                            "range": {
+                                "timestamp": {
+                                    "gte": start_time.isoformat(),
+                                    "lte": end_time.isoformat(),
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+
+            agg_query = {
+                "query": query,
+                "aggs": {
+                    "total_logs": {"value_count": {"field": "id"}},
+                    "pii_detected": {"filter": {"term": {"has_pii": True}}},
+                    "entity_types": {"terms": {"field": "entity_types", "size": 25}},
+                    "hourly_stats": {
+                        "date_histogram": {
+                            "field": "timestamp",
+                            "calendar_interval": "hour",
+                            "min_doc_count": 0,
+                            "extended_bounds": {
+                                "min": start_time.isoformat(),
+                                "max": end_time.isoformat(),
+                            },
+                        }
+                    },
+                    "quarterly_stats": {
+                        "date_histogram": {
+                            "field": "timestamp",
+                            "calendar_interval": "quarter",
+                        },
+                        "aggs": {
+                            "pii_detected": {"filter": {"term": {"has_pii": True}}}
+                        },
+                    },
+                    "top_ips": {"terms": {"field": "client_ip", "size": 10}},
+                    "label_action_breakdown": {
+                        "terms": {"field": "entity_types", "size": 25},
+                        "aggs": {
+                            "actions": {"terms": {"field": "metadata.action.keyword", "size": 10}}
+                        },
+                    },
+                    "log_status_stats": {"terms": {"field": "metadata.log_status.keyword", "size": 10}},
+                    "project_stats": {"terms": {"field": "metadata.project.keyword", "size": 20}},
+                    "ai_service_stats": {"terms": {"field": "metadata.service.keyword", "size": 20}},
+                },
+                "size": 0,
+            }
+
+            response = self.es_client.search(index=self.index_name, body=agg_query)
+            return response.get("aggregations", {})
+
+        except Exception as e:
+            logger.error(f"Failed to get dashboard summary stats: {str(e)}")
+            return {}
+
+    async def get_recent_detections(self, limit: int = 10, since: Optional[datetime] = None) -> List[PIIDetectionLog]:
+        """최근 탐지된 로그를 조회"""
+        if not self.es_client:
+            logger.warning("Elasticsearch client not available while fetching recent detections")
+            return []
+
+        try:
+            must_conditions: List[Dict[str, Any]] = [
+                {"term": {"has_pii": True}}
+            ]
+
+            if since is not None:
+                must_conditions.append(
+                    {
+                        "range": {
+                            "timestamp": {
+                                "gte": since.isoformat(),
+                            }
+                        }
+                    }
+                )
+
+            query = {"bool": {"must": must_conditions}}
+
+            response = self.es_client.search(
+                index=self.index_name,
+                body={
+                    "query": query,
+                    "sort": [{"timestamp": {"order": "desc"}}],
+                    "size": limit,
+                },
+            )
+
+            hits = response.get("hits", {}).get("hits", [])
+            logs: List[PIIDetectionLog] = []
+            for hit in hits:
+                source = hit.get("_source", {})
+                source["id"] = hit.get("_id")
+                try:
+                    logs.append(PIIDetectionLog(**source))
+                except Exception as e:
+                    logger.warning(f"Failed to parse recent detection hit: {e}")
+
+            return logs
+
+        except Exception as e:
+            logger.error(f"Failed to get recent detections: {str(e)}")
+            return []
 
     async def count_blocks_since(self, start_time: datetime) -> int:
         """특정 시간 이후의 차단 로그 개수를 집계"""

@@ -6,6 +6,10 @@ from app.api.routers.auth import router as auth_router
 from app.api.routers.logs import router as logs_router
 from app.api.routers.detection_rules import router as detection_rules_router
 from app.api.routers import metrics as metrics_router
+from app.api.routers import dashboard as dashboard_router
+from app.api.routers import detection_settings as detection_settings_router
+from app.api.routers import projects as projects_router
+from app.api.routers import system_settings as system_settings_router
 from app.ai.model_manager import preload_models, cleanup_models
 import logging
 
@@ -36,6 +40,10 @@ app.include_router(pii_router, prefix="/api/v1/pii", tags=["PII Detection"])  # 
 app.include_router(logs_router, prefix="/api/v1/logs", tags=["Logs"])  # 로그 API
 app.include_router(detection_rules_router, prefix="/api/v1/detection-rules", tags=["Detection Rules"])  # 탐지 규칙 API
 app.include_router(metrics_router.router) # 통계 API
+app.include_router(dashboard_router.router)  # 대시보드 집계 API
+app.include_router(detection_settings_router.router)  # 탐지 기능 설정 API
+app.include_router(projects_router.router)  # 프로젝트 관리 API
+app.include_router(system_settings_router.router)  # 시스템 설정 API
 
 # 애플리케이션 시작/종료 이벤트 핸들러
 @app.on_event("startup")
